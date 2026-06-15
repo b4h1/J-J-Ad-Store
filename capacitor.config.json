@@ -1,0 +1,6 @@
+{
+  "appId": "com.bahreabfeleke.adquest",
+  "appName": "AdQuest Mobile Suite",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}

@@ -7,6 +7,7 @@ import {
   Code, 
   Database, 
   Sparkles, 
+  Zap,
   Flame, 
   Gift, 
   LogOut, 
@@ -49,10 +50,32 @@ interface UserDocument {
   name: string;
   email: string;
   pointsBalance: number;
+  appPoints?: Record<string, number>; // Points indexed per app (id => points)
   lifetimeAdsWatched: number;
   myReferralCode: string;
   referredBy: string; // ID of user who referred, or "none"
 }
+
+interface AppConfig {
+  id: string;
+  name: string;
+  category: string;
+  shortName: string;
+  icon: string;
+}
+
+const MOCK_APPS: AppConfig[] = [
+  { id: 'app_1', name: 'Ethio News & Points', category: 'News', shortName: 'EthioNews', icon: 'BookOpen' },
+  { id: 'app_2', name: 'Amharic Trivia Arcade', category: 'Gaming', shortName: 'AmhTrivia', icon: 'Award' },
+  { id: 'app_3', name: 'Habesha Clicker Game', category: 'Gaming', shortName: 'Clicker', icon: 'Flame' },
+  { id: 'app_4', name: 'Fana Rewards Hub', category: 'Utility', shortName: 'FanaHub', icon: 'Sparkles' },
+  { id: 'app_5', name: 'Gezeta Mini Games', category: 'Gaming', shortName: 'Gezeta', icon: 'Activity' },
+  { id: 'app_6', name: 'Abyssinia Utility Pro', category: 'Utility', shortName: 'Abyssinia', icon: 'Settings' },
+  { id: 'app_7', name: 'Sheger Coin Collector', category: 'Gaming', shortName: 'Sheger', icon: 'Coins' },
+  { id: 'app_8', name: 'Sodere Video Stream', category: 'Entertainment', shortName: 'Sodere', icon: 'Play' },
+  { id: 'app_9', name: 'Tarik History Quiz', category: 'Education', shortName: 'TarikQuiz', icon: 'HelpCircle' },
+  { id: 'app_10', name: 'Bole Rewards Express', category: 'Finance', shortName: 'BoleRewards', icon: 'Zap' },
+];
 
 interface ReferralDocument {
   id: string;
@@ -105,6 +128,11 @@ const INITIAL_USERS: UserDocument[] = [
     name: 'Alex Bahre',
     email: 'alexbahre@gmail.com',
     pointsBalance: 350,
+    appPoints: {
+      app_1: 100,
+      app_2: 200,
+      app_3: 50
+    },
     lifetimeAdsWatched: 8,
     myReferralCode: 'BAH5832', // First 3: "BAH" + 4 digits
     referredBy: 'none'
@@ -114,6 +142,11 @@ const INITIAL_USERS: UserDocument[] = [
     name: 'Jessica Reed',
     email: 'jreed@gmail.com',
     pointsBalance: 820,
+    appPoints: {
+      app_1: 300,
+      app_2: 400,
+      app_3: 120
+    },
     lifetimeAdsWatched: 24,
     myReferralCode: 'REE7491', // First 3: "REE" + 4 digits
     referredBy: 'none'
@@ -123,6 +156,10 @@ const INITIAL_USERS: UserDocument[] = [
     name: 'Michael Peterson',
     email: 'mpeterson@outlook.com',
     pointsBalance: 120,
+    appPoints: {
+      app_1: 70,
+      app_2: 50
+    },
     lifetimeAdsWatched: 2,
     myReferralCode: 'PET9942', // First 3: "PET" + 4 digits
     referredBy: 'user_alex'  // Referred by Alex
@@ -178,7 +215,20 @@ const TRANSLATIONS = {
     pointsClaimed: '+5 Points Claimed!',
     redeemSuccess: 'Redemption Completed!',
     activeReceipt: 'Active receipt generated securely in collection database log.',
-    returnStore: 'Return to Store'
+    returnStore: 'Return to Store',
+    gameTab: 'Arcade',
+    gameTitle: 'AdQuest Play Zone',
+    activeMultiplier: 'Active Multiplier',
+    cooldownStatus: 'Reward Ad Cooldown',
+    doublePointsActive: '⚡ 2X DOUBLE BOOST ACTIVE!',
+    unlockPremium: 'Unlock Premium Live Challenge',
+    triviaQuest: 'Trivia Challenge',
+    coinTapper: 'Golden Coin Tapper',
+    selectAnswer: 'Verify Answer',
+    interstitialTitle: 'AdMob Interstitial Ad',
+    interstitialClose: 'Skip Ad & Return',
+    interstitialCounting: 'Ad closes in {s}s',
+    bannerSponsor: 'SPONSORED LINK'
   },
   am: {
     rewardCenter: 'የሽልማት ማዕከል',
@@ -216,16 +266,81 @@ const TRANSLATIONS = {
     verifiedGold: 'የተረጋገጠ ወርቅ',
     codeUtilized: 'ኮድ ጥቅም ላይ ውሏል',
     pointsClaimed: '+5 ነጥብ ተጨምሯል!',
-    redeemSuccess: 'ልውውጡ ተጠናቋል!',
+    redeemSuccess: 'ልውውጡ ተጠናቆል!',
     activeReceipt: 'ደረሰኝ በደህንነት ረገድ በዳታቤዝ ውስጥ ተመዝግቧል።',
-    returnStore: 'ወደ ሱቅ ይመለሱ'
+    returnStore: 'ወደ ሱቅ ይመለሱ',
+    gameTab: 'ጨዋታ',
+    gameTitle: 'የጨዋታ ማዕከል',
+    activeMultiplier: 'የነጥብ ማባዣ',
+    cooldownStatus: 'ቀጣይ ማስታወቂያ ለመመልከት',
+    doublePointsActive: '⚡ ባለ 2 እጥፍ ማባዣ እያገለገለ ነው!',
+    unlockPremium: 'ልዩ ፈተናዎችን ይክፈቱ',
+    triviaQuest: 'የጥያቄና መልስ ውድድር',
+    coinTapper: 'የወርቅ ሳንቲም ንካ',
+    selectAnswer: 'መልስ አረጋግጥ',
+    interstitialTitle: 'AdMob መካከለኛ ማስታወቂያ',
+    interstitialClose: 'ዝለልና ተመለስ',
+    interstitialCounting: 'በ {s} ሰከንድ ውስጥ ይዘጋል',
+    bannerSponsor: 'የማስታወቂያ ስፖንሰር'
   }
 };
+
+const MOCK_BANNER_ADS = [
+  { text: "Safaricom 5G Home Internet - Superfast speeds from 500 Pts!", action: "Join Safaricom Campaign", url: "https://safaricom.et/promo-5g" },
+  { text: "Ethio Telecom LTE Boost - Double your data bandwidth package!", action: "Claim Ethio Promo", url: "https://ethiotelecom.et/lte-boost" },
+  { text: "Merge Luxury Saga - Compile Card Decks to unlock exclusive bonuses!", action: "Download Now", url: "https://adquest.game/mergeluxury" },
+  { text: "Jolly's Coffee House - 15% discount code for certified developers: DEVPTS!", action: "Open Maps Coupon", url: "https://jollyscoffee.et/maps" }
+];
+
+const TRIVIA_QUESTIONS = [
+  {
+    en: {
+      question: "Which ancient obelisk is located in Northern Ethiopia?",
+      options: ["Obelisk of Axum", "Lalibela monolith", "Gondar Castle", "Tiya stones"],
+      correctIndex: 0,
+      reward: 5
+    },
+    am: {
+      question: "በሰሜን ኢትዮጵያ የሚገኘው ታሪካዊ ሐውልት የትኛው ነው?",
+      options: ["የአክሱም ሐውልት", "የአለት ውቅር", "የጎንደር ግንብ", "የቲያ ትከሎች"],
+      correctIndex: 0,
+      reward: 5
+    }
+  },
+  {
+    en: {
+      question: "What is Flutter's primary programming language?",
+      options: ["Kotlin", "Java", "Swift", "Dart"],
+      correctIndex: 3,
+      reward: 5
+    },
+    am: {
+      question: "በFlutter ልማት ውስጥ የሚመረጠው ዋና ፕሮግራሚንግ ቋንቋ ምንድነው?",
+      options: ["Kotlin", "Java", "Swift", "Dart"],
+      correctIndex: 3,
+      reward: 5
+    }
+  },
+  {
+    en: {
+      question: "Which telecom operator launched Ethiopia's second active mobile network?",
+      options: ["Airtel", "Ethio Telecom", "Safaricom Ethiopia", "Vodacom"],
+      correctIndex: 2,
+      reward: 5
+    },
+    am: {
+      question: "በኢትዮጵያ ሁለተኛውን የሞባይል ኔትወርክ ያስጀመረው የቴሌኮም ኩባንያ የትኛው ነው?",
+      options: ["Airtel", "ኢትዮ ቴሌኮም", "ሳፋሪኮም ኢትዮጵያ", "Vodacom"],
+      correctIndex: 2,
+      reward: 5
+    }
+  }
+];
 
 export default function App() {
   // --- Translation Context Helpers ---
   const [language, setLanguage] = useState<'en' | 'am'>('en');
-  const [themeMode, setThemeMode] = useState<'light' | 'dark'>('dark');
+  const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light');
   const t = TRANSLATIONS[language];
 
   // --- Persistent Storage State ---
@@ -270,6 +385,7 @@ export default function App() {
 
   // --- Session Control ---
   const [activeUid, setActiveUid] = useState<string>('user_alex');
+  const [activeAppId, setActiveAppId] = useState<string>('app_1');
   const currentUser = users.find(u => u.uid === activeUid) || null;
 
   // --- Active Tab in Main Web App Dashboard ---
@@ -313,7 +429,8 @@ export default function App() {
   }, [admobIosAdUnitId]);
 
   // --- Mobile Screen State Simulation ---
-  const [mobileScreen, setMobileScreen] = useState<'auth' | 'dashboard' | 'store' | 'referral' | 'setting'>('dashboard');
+  const [mobileScreen, setMobileScreen] = useState<'auth' | 'dashboard' | 'store' | 'referral' | 'setting' | 'game'>('dashboard');
+  const [settingSubView, setSettingSubView] = useState<'main' | 'about'>('main');
   const [isAuthSignUp, setIsAuthSignUp] = useState<boolean>(false);
   const [authEmail, setAuthEmail] = useState<string>('');
   const [authPassword, setAuthPassword] = useState<string>('');
@@ -330,6 +447,26 @@ export default function App() {
   const [adIsPlaying, setAdIsPlaying] = useState<boolean>(false);
   const [adVolumeMuted, setAdVolumeMuted] = useState<boolean>(false);
   const [adCompleted, setAdCompleted] = useState<boolean>(false);
+
+  // --- New AdMob spacing, format mixing, and addictive gameplay integration states ---
+  const [rewardedCooldownLeft, setRewardedCooldownLeft] = useState<number>(0);
+  const [boostTimeLeft, setBoostTimeLeft] = useState<number>(0);
+  const [showInterstitial, setShowInterstitial] = useState<boolean>(false);
+  const [interstitialPlaybackTimer, setInterstitialPlaybackTimer] = useState<number>(3);
+  const [currentBannerAdIndex, setCurrentBannerAdIndex] = useState<number>(0);
+  const [tabSwitchCount, setTabSwitchCount] = useState<number>(0);
+  const [activeSpeedTesting, setActiveSpeedTesting] = useState<boolean>(false);
+
+  // Game Play Zone State declarations
+  const [gameMode, setGameMode] = useState<'trivia' | 'tapper'>('trivia');
+  const [activeTriviaIndex, setActiveTriviaIndex] = useState<number>(0);
+  const [selectedAnswerIndex, setSelectedAnswerIndex] = useState<number | null>(null);
+  const [answerSubmitted, setAnswerSubmitted] = useState<boolean>(false);
+  const [answerIsCorrect, setAnswerIsCorrect] = useState<boolean | null>(null);
+
+  // Coin Tapper Grid Cell
+  const [activeCoinCell, setActiveCoinCell] = useState<number>(0);
+  const [tapScore, setTapScore] = useState<number>(0);
 
   // Confetti / Float Points animations triggers
   const [showPointsFloating, setShowPointsFloating] = useState<boolean>(false);
@@ -376,6 +513,49 @@ export default function App() {
     }
     return () => clearInterval(interval);
   }, [showAdOverlay, adIsPlaying, adPlaybackTimer]);
+
+  // Hook 1: Reward cooldown and multiplier boost duration ticking
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (rewardedCooldownLeft > 0) {
+        setRewardedCooldownLeft(prev => prev - 1);
+      }
+      if (boostTimeLeft > 0) {
+        setBoostTimeLeft(prev => prev - 1);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [rewardedCooldownLeft, boostTimeLeft]);
+
+  // Hook 2: Interstitial simulation count down
+  useEffect(() => {
+    let interval: any;
+    if (showInterstitial && interstitialPlaybackTimer > 0) {
+      interval = setInterval(() => {
+        setInterstitialPlaybackTimer(prev => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [showInterstitial, interstitialPlaybackTimer]);
+
+  // Hook 3: Banner Ad selection index progression (cycles every 8s)
+  useEffect(() => {
+    const bannerInterval = setInterval(() => {
+      setCurrentBannerAdIndex(prev => (prev + 1) % MOCK_BANNER_ADS.length);
+    }, 8000);
+    return () => clearInterval(bannerInterval);
+  }, []);
+
+  // Hook 4: Coin clicker layout spawner (ticks every 1.5s in active tapper mode)
+  useEffect(() => {
+    let interval: any;
+    if (mobileScreen === 'game' && gameMode === 'tapper') {
+      interval = setInterval(() => {
+        setActiveCoinCell(Math.floor(Math.random() * 6));
+      }, 1500);
+    }
+    return () => clearInterval(interval);
+  }, [mobileScreen, gameMode]);
 
   // --- Handlers mimicking mobile backend operations ---
 
@@ -433,6 +613,7 @@ export default function App() {
       name: authName,
       email: authEmail,
       pointsBalance: 0,
+      appPoints: {},
       lifetimeAdsWatched: 0,
       myReferralCode: generatedReferralCode,
       referredBy: 'none'
@@ -457,6 +638,10 @@ export default function App() {
 
   // Trigger Google Mobile Ads SDK Simulator Overlay
   const startAdMobVideoPlayback = () => {
+    if (rewardedCooldownLeft > 0) {
+      addLog('ad', `AdMob RateLimit: Rewarded video is in cooldown. Please wait ${Math.floor(rewardedCooldownLeft / 60)}m ${rewardedCooldownLeft % 60}s before requesting a new reward.`);
+      return;
+    }
     setAdPlaybackTimer(5);
     setAdCompleted(false);
     setAdIsPlaying(true);
@@ -468,12 +653,26 @@ export default function App() {
   const handleAdMobRewardConsent = () => {
     if (!currentUser) return;
 
-    // Increment pointsBalance and lifetimeAdsWatched atomically
+    const hasBoost = boostTimeLeft > 0;
+    const ptsEarned = hasBoost ? 10 : 5; // 2x multiplier applies to the reward ad watch itself!
+    
+    // Limits watch to 1 video every 15-30 mins; we'll use 15 mins (900 seconds) by default
+    // If activeSpeedTesting is true, we compress to 15 seconds cooldown and 30 seconds boost
+    const cooldownDuration = activeSpeedTesting ? 15 : 905; 
+    const boostDuration = activeSpeedTesting ? 30 : 600; // 10 minutes of active boost multiplier!
+
+    setRewardedCooldownLeft(cooldownDuration);
+    setBoostTimeLeft(boostDuration);
+
+    // Increment pointsBalance and lifetimeAdsWatched atomically, also updating active appPoints
     const updatedUsers = users.map(user => {
       if (user.uid === currentUser.uid) {
+        const currentAppPoints = { ...(user.appPoints || {}) };
+        currentAppPoints[activeAppId] = (currentAppPoints[activeAppId] || 0) + ptsEarned;
         return {
           ...user,
-          pointsBalance: user.pointsBalance + 5,
+          appPoints: currentAppPoints,
+          pointsBalance: user.pointsBalance + ptsEarned,
           lifetimeAdsWatched: user.lifetimeAdsWatched + 1
         };
       }
@@ -485,9 +684,139 @@ export default function App() {
     setShowPointsFloating(true);
     setTimeout(() => {
       setShowPointsFloating(false);
-    }, 2800);
+    }, 2850);
 
-    addLog('ad', `Firestore Transaction SUCCESS: Awarded +5 points to ${currentUser.name}. Lifetime ads watched: ${currentUser.lifetimeAdsWatched + 1}`);
+    addLog('ad', `Firestore Transaction SUCCESS: Awarded +${ptsEarned} points (assigned to app ${MOCK_APPS.find(a=>a.id === activeAppId)?.name}) to ${currentUser.name} (Multiplier Boost: ${hasBoost ? 'ACTIVE (+10)' : 'INACTIVE (+5)'}). Cooldown initiated.`);
+  };
+
+  // Banner Ad interactions
+  const handleBannerAdClick = (ad: typeof MOCK_BANNER_ADS[0]) => {
+    if (!currentUser) return;
+    
+    const boostActive = boostTimeLeft > 0;
+    const pointsAwarded = boostActive ? 2 : 1; 
+
+    const updatedUsers = users.map(user => {
+      if (user.uid === currentUser.uid) {
+        const currentAppPoints = { ...(user.appPoints || {}) };
+        currentAppPoints[activeAppId] = (currentAppPoints[activeAppId] || 0) + pointsAwarded;
+        return {
+          ...user,
+          appPoints: currentAppPoints,
+          pointsBalance: user.pointsBalance + pointsAwarded
+        };
+      }
+      return user;
+    });
+    setUsers(updatedUsers);
+    
+    addLog('ad', `AdMob Engagement: Clicked Adaptive Banner "${ad.text.split(' - ')[0]}". Awarded +${pointsAwarded} points to app ${MOCK_APPS.find(a=>a.id === activeAppId)?.name} (Multiplier: ${boostActive ? '2X Active' : 'Off'}).`);
+    
+    setShowPointsFloating(true);
+    setTimeout(() => {
+      setShowPointsFloating(false);
+    }, 1500);
+  };
+
+  // Switch mobile screen with interstitial breaks on tab changes
+  const handleMobileScreenChange = (screen: 'auth' | 'dashboard' | 'store' | 'referral' | 'setting' | 'game') => {
+    setMobileScreen(screen);
+    setSettingSubView('main');
+    
+    // Add tab switch tracker
+    setTabSwitchCount(prev => {
+      const next = prev + 1;
+      // Every 3 tab swaps, trigger interstitial ad seamlessly to represent real full-stack design!
+      if (next % 3 === 0) {
+        setInterstitialPlaybackTimer(3);
+        setShowInterstitial(true);
+        addLog('ad', `AdMob Interstitial Ad Request: Loading natural interstitial break on transition to '${screen.toUpperCase()}' screen.`);
+      }
+      return next;
+    });
+  };
+
+  // Trivia Quiz arcade state handlers
+  const handleTriviaAnswerSelect = (optionIndex: number) => {
+    if (answerSubmitted) return;
+    setSelectedAnswerIndex(optionIndex);
+  };
+
+  const handleTriviaVerification = () => {
+    if (selectedAnswerIndex === null || !currentUser) return;
+    
+    const activeQuestion = TRIVIA_QUESTIONS[activeTriviaIndex];
+    const currentQ = language === 'am' ? activeQuestion.am : activeQuestion.en;
+    const isCorrect = selectedAnswerIndex === currentQ.correctIndex;
+    
+    setAnswerSubmitted(true);
+    setAnswerIsCorrect(isCorrect);
+    
+    if (isCorrect) {
+      const boostActive = boostTimeLeft > 0;
+      const pointsToAward = boostActive ? (currentQ.reward * 2) : currentQ.reward;
+      
+      const updatedUsers = users.map(user => {
+        if (user.uid === currentUser.uid) {
+          const currentAppPoints = { ...(user.appPoints || {}) };
+          currentAppPoints[activeAppId] = (currentAppPoints[activeAppId] || 0) + pointsToAward;
+          return {
+            ...user,
+            appPoints: currentAppPoints,
+            pointsBalance: user.pointsBalance + pointsToAward
+          };
+        }
+        return user;
+      });
+      setUsers(updatedUsers);
+      addLog('purchase', `Trivia Challenge Complete: Answer is CORRECT! Earned +${pointsToAward} points. Multiplier: ${boostActive ? '2X' : '1X'}`);
+    } else {
+      addLog('purchase', `Trivia Challenge Complete: Answer is INCORRECT. Correct option was ${currentQ.options[currentQ.correctIndex]}. No points gained.`);
+    }
+
+    // 40% chance of triggering interstitial on question answer submission mapping natural gaming transitions
+    if (Math.random() < 0.4) {
+      setTimeout(() => {
+        setInterstitialPlaybackTimer(3);
+        setShowInterstitial(true);
+        addLog('ad', `AdMob Interstitial: Seamlessly triggered interstitial ad break after Trivia verification.`);
+      }, 1000);
+    }
+  };
+
+  const handleNextTriviaQuestion = () => {
+    setSelectedAnswerIndex(null);
+    setAnswerSubmitted(false);
+    setAnswerIsCorrect(null);
+    setActiveTriviaIndex((prev) => (prev + 1) % TRIVIA_QUESTIONS.length);
+  };
+
+  // Coin Tapper quick tapper score accumulator
+  const handleCoinTap = (index: number) => {
+    if (index === activeCoinCell && currentUser) {
+      const boostActive = boostTimeLeft > 0;
+      const pointsAdded = boostActive ? 2 : 1;
+
+      // Update balance
+      const updatedUsers = users.map(user => {
+        if (user.uid === currentUser.uid) {
+          const currentAppPoints = { ...(user.appPoints || {}) };
+          currentAppPoints[activeAppId] = (currentAppPoints[activeAppId] || 0) + pointsAdded;
+          return {
+            ...user,
+            appPoints: currentAppPoints,
+            pointsBalance: user.pointsBalance + pointsAdded
+          };
+        }
+        return user;
+      });
+      setUsers(updatedUsers);
+      setTapScore(prev => prev + pointsAdded);
+      addLog('purchase', `Tapper Action: Captured Golden Coin! Earned +${pointsAdded} points. Multiplier: ${boostActive ? '2X' : '1X'}`);
+
+      // Shift coin randomly immediately
+      setActiveCoinCell(Math.floor(Math.random() * 6));
+    }
   };
 
   // Secure Firestore Referral Transaction Simulation
@@ -528,15 +857,21 @@ export default function App() {
     // Criteria 4: Atomic Multi-document write: Award +100 to both, set referredBy of current to partner uid
     const updatedUsers = users.map(user => {
       if (user.uid === currentUser.uid) {
+        const currentAppPoints = { ...(user.appPoints || {}) };
+        currentAppPoints[activeAppId] = (currentAppPoints[activeAppId] || 0) + 100;
         return {
           ...user,
+          appPoints: currentAppPoints,
           pointsBalance: user.pointsBalance + 100,
           referredBy: hostUser.uid
         };
       }
       if (user.uid === hostUser.uid) {
+        const currentAppPoints = { ...(user.appPoints || {}) };
+        currentAppPoints[activeAppId] = (currentAppPoints[activeAppId] || 0) + 100;
         return {
           ...user,
+          appPoints: currentAppPoints,
           pointsBalance: user.pointsBalance + 100
         };
       }
@@ -571,9 +906,13 @@ export default function App() {
     // Execute atomic write deducting points and rendering receipts
     const updatedUsers = users.map(user => {
       if (user.uid === currentUser.uid) {
+        const currentAppPoints = { ...(user.appPoints || {}) };
+        const currentActiveAppPts = currentAppPoints[activeAppId] || 0;
+        currentAppPoints[activeAppId] = Math.max(0, currentActiveAppPts - item.pointsCost);
         return {
           ...user,
-          pointsBalance: user.pointsBalance - item.pointsCost
+          appPoints: currentAppPoints,
+          pointsBalance: Math.max(0, user.pointsBalance - item.pointsCost)
         };
       }
       return user;
@@ -862,6 +1201,28 @@ export default function App() {
                             </div>
                             <div className="text-right font-bold">
                               Points Balance: <span className="text-gold-400 font-black">{user.pointsBalance} Pts</span>
+                            </div>
+                            <div className="col-span-2 border-t border-zinc-900 pt-1.5 mt-1">
+                              <div className="flex items-center justify-between text-[8.5px] uppercase tracking-wider text-zinc-500 font-bold mb-1">
+                                <span className={themeMode === 'light' ? 'text-zinc-600' : 'text-zinc-500'}>Multi-App Ledgers</span>
+                                <span className="text-[7.5px] font-normal font-sans">Synced Collections</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[8.5px] bg-[#030303] p-1.5 rounded border border-zinc-900/60 font-mono">
+                                {MOCK_APPS.map(app => {
+                                  const pts = (user.appPoints && user.appPoints[app.id] !== undefined) ? user.appPoints[app.id] : 0;
+                                  const isAppActive = app.id === activeAppId && isActive;
+                                  return (
+                                    <div key={app.id} className="flex justify-between truncate items-center">
+                                      <span className={`${isAppActive ? 'text-gold-300 font-black' : 'text-zinc-500'}`}>
+                                        • {app.shortName}:
+                                      </span>
+                                      <span className={`${pts > 0 ? (isAppActive ? 'text-gold-400 font-extrabold' : 'text-zinc-300') : 'text-zinc-600'}`}>
+                                        {pts} Pts
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
                             <div className="col-span-2 border-t border-zinc-900 pt-1 mt-1 flex items-center justify-between text-[9px]">
                               <span>referredBy:</span>
@@ -1477,20 +1838,52 @@ export default function App() {
                 
                 {/* 1. M3 TITLE APP HEADER BAR */}
                 {mobileScreen !== 'auth' && currentUser && (
-                  <header className={`px-4 py-3 flex items-center justify-between select-none border-b transition-all ${themeMode === 'light' ? 'bg-white border-zinc-200 shadow-sm text-zinc-900' : 'bg-[#0c0c0c] border-zinc-900 text-zinc-100'}`}>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-6 h-6 rounded bg-gradient-to-tr from-gold-500 to-gold-400 flex items-center justify-center shadow-sm">
-                        <Coins className="w-3.5 h-3.5 text-black" />
+                  <div className="flex flex-col">
+                    <header className={`px-4 py-2.5 flex items-center justify-between select-none border-b transition-all ${themeMode === 'light' ? 'bg-white border-zinc-200 shadow-sm text-zinc-900' : 'bg-[#0c0c0c] border-zinc-900 text-zinc-100'}`}>
+                      <div className="flex items-center space-x-2 max-w-[170px]">
+                        <div className="w-6 h-6 rounded bg-gradient-to-tr from-gold-500 to-gold-400 flex items-center justify-center shadow-sm shrink-0">
+                          <Coins className="w-3.5 h-3.5 text-black" />
+                        </div>
+                        <span className={`text-[11px] font-serif font-black truncate tracking-tight uppercase ${themeMode === 'light' ? 'text-zinc-800' : 'text-gold-400'}`}>
+                          {MOCK_APPS.find(a => a.id === activeAppId)?.name || t.rewardCenter}
+                        </span>
                       </div>
-                      <span className={`text-xs font-serif font-black tracking-widest uppercase ${themeMode === 'light' ? 'text-zinc-800' : 'text-gold-400'}`}>{t.rewardCenter}</span>
-                    </div>
 
-                    {/* Stream snapshot point pill */}
-                    <div className={`rounded-full px-2.5 py-0.5 flex items-center space-x-1 font-mono text-[10px] font-bold transition-all border ${themeMode === 'light' ? 'bg-amber-500/10 border-amber-300 text-amber-800' : 'bg-gold-500/10 border-gold-500/25 text-gold-300'}`}>
-                      <Coins className={`w-3 h-3 ${themeMode === 'light' ? 'text-amber-600 fill-amber-650' : 'text-gold-400 fill-gold-400'}`} />
-                      <span>{currentUser.pointsBalance} {language === 'am' ? 'ነጥብ' : 'Pts'}</span>
+                      {/* Unified App points balance pill */}
+                      <div className={`rounded-full px-2.5 py-0.5 flex items-center space-x-1 font-mono text-[9px] font-bold transition-all border ${themeMode === 'light' ? 'bg-amber-500/10 border-amber-300 text-amber-800' : 'bg-gold-500/10 border-gold-500/25 text-gold-300'}`}>
+                        <Coins className={`w-3 h-3 ${themeMode === 'light' ? 'text-amber-600 fill-amber-650' : 'text-gold-400 fill-gold-400'}`} />
+                        <span>{(currentUser.appPoints && currentUser.appPoints[activeAppId]) || 0} / {currentUser.pointsBalance} Pts</span>
+                      </div>
+                    </header>
+
+                    {/* Integrated Smartphone Context Swapper */}
+                    <div className={`px-4 py-1.5 border-b flex items-center justify-between text-[9px] transition-all pin-top-navbar ${
+                      themeMode === 'light' ? 'bg-amber-500/5 border-amber-500/10 text-amber-900' : 'bg-[#100f0d] border-gold-500/10 text-gold-300'
+                    }`}>
+                      <div className="flex items-center space-x-1 font-sans">
+                        <Smartphone className="w-3 h-3 text-gold-400" />
+                        <span className="font-bold uppercase tracking-wider text-[8px]">App Simulator Gateway:</span>
+                      </div>
+                      <select
+                        value={activeAppId}
+                        onChange={(e) => {
+                          setActiveAppId(e.target.value);
+                          addLog('system', `App Switch: Loaded simulated mobile interface context [${MOCK_APPS.find(a => a.id === e.target.value)?.name}]`);
+                        }}
+                        className={`px-1.5 py-0.5 rounded font-bold font-mono border text-[8px] max-w-[160px] outline-none cursor-pointer ${
+                          themeMode === 'light'
+                            ? 'bg-white border-zinc-200 text-zinc-850'
+                            : 'bg-black border-zinc-850 text-gold-400 focus:border-gold-400'
+                        }`}
+                      >
+                        {MOCK_APPS.map(app => (
+                          <option key={app.id} value={app.id}>
+                            {app.shortName} ({(currentUser.appPoints && currentUser.appPoints[app.id]) || 0} Pts)
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                  </header>
+                  </div>
                 )}
 
                 {/* 2. BODY CONTENT ROUTER (Tabbed routing based on screen state selection) */}
@@ -1538,7 +1931,11 @@ export default function App() {
                                 value={authName}
                                 onChange={(e) => setAuthName(e.target.value)}
                                 placeholder="e.g. Jessica Reed"
-                                className="w-full bg-[#0c0c0c] border border-zinc-900 rounded-lg p-2 pl-9 text-xs text-zinc-100 placeholder-zinc-700 focus:outline-none focus:border-gold-550/50"
+                                className={`w-full border rounded-lg p-2 pl-9 text-xs placeholder-zinc-500 focus:outline-none transition-all ${
+                                  themeMode === 'light'
+                                    ? 'bg-white border-zinc-200 text-zinc-800 focus:border-amber-500/55'
+                                    : 'bg-[#0c0c0c] border-zinc-900 text-zinc-100 focus:border-gold-550/50'
+                                }`}
                               />
                             </div>
                           </div>
@@ -1553,7 +1950,11 @@ export default function App() {
                               value={authEmail}
                               onChange={(e) => setAuthEmail(e.target.value)}
                               placeholder={isAuthSignUp ? "you@example.com" : "alexbahre@gmail.com"}
-                              className="w-full bg-[#0c0c0c] border border-zinc-900 rounded-lg p-2 pl-9 text-xs text-zinc-100 placeholder-zinc-700 focus:outline-none focus:border-gold-550/50"
+                              className={`w-full border rounded-lg p-2 pl-9 text-xs placeholder-zinc-500 focus:outline-none transition-all ${
+                                themeMode === 'light'
+                                  ? 'bg-white border-zinc-200 text-zinc-800 focus:border-amber-500/55'
+                                  : 'bg-[#0c0c0c] border-zinc-900 text-zinc-100 focus:border-gold-550/50'
+                              }`}
                             />
                           </div>
                         </div>
@@ -1567,7 +1968,11 @@ export default function App() {
                               value={authPassword}
                               onChange={(e) => setAuthPassword(e.target.value)}
                               placeholder="••••••••"
-                              className="w-full bg-[#0c0c0c] border border-zinc-900 rounded-lg p-2 pl-9 text-xs text-zinc-100 placeholder-zinc-700 focus:outline-none focus:border-gold-550/50"
+                              className={`w-full border rounded-lg p-2 pl-9 text-xs placeholder-zinc-500 focus:outline-none transition-all ${
+                                themeMode === 'light'
+                                  ? 'bg-white border-zinc-200 text-zinc-800 focus:border-amber-500/55'
+                                  : 'bg-[#0c0c0c] border-zinc-900 text-zinc-100 focus:border-gold-550/50'
+                              }`}
                             />
                           </div>
                         </div>
@@ -1677,6 +2082,47 @@ export default function App() {
                         })()}
                       </div>
 
+                      {/* Unified App Ledger within Client Simulator */}
+                      <div className={`p-4 rounded-xl space-y-3 transition-all border ${
+                        themeMode === 'light' ? 'bg-white border-zinc-200 shadow-sm' : 'bg-[#0c0c0c] border-zinc-900'
+                      }`}>
+                        <div className="flex justify-between items-center pb-2 border-b border-zinc-900/10">
+                          <span className={`text-[9px] uppercase font-serif font-black tracking-wider ${themeMode === 'light' ? 'text-zinc-700' : 'text-gold-400'}`}>
+                            {language === 'am' ? 'የተጓዳኝ መተግበሪያዎች ዝርዝር' : 'Unified App Ledger'}
+                          </span>
+                          <span className="text-[8px] font-mono text-zinc-500">{language === 'am' ? 'ማዕከላዊ ዳታቤዝ' : 'Central Sync'}</span>
+                        </div>
+
+                        <div className="space-y-1 max-h-[140px] overflow-y-auto pr-1 select-none">
+                          {MOCK_APPS.map((app) => {
+                            const isSelectedApp = app.id === activeAppId;
+                            const pts = (currentUser.appPoints && currentUser.appPoints[app.id] !== undefined)
+                              ? currentUser.appPoints[app.id]
+                              : 0;
+                            return (
+                              <div 
+                                key={app.id} 
+                                onClick={() => {
+                                  setActiveAppId(app.id);
+                                  addLog('system', `App Switch: Clicked mobile ledger switching active context to [${app.name}]`);
+                                }}
+                                className={`flex items-center justify-between p-2 rounded transition-all cursor-pointer text-[9.5px] ${
+                                  isSelectedApp 
+                                    ? (themeMode === 'light' ? 'bg-amber-500/15 text-amber-900 font-bold border border-amber-500/30 shadow-sm' : 'bg-gold-400/10 text-gold-300 font-bold border border-gold-400/25')
+                                    : (themeMode === 'light' ? 'border border-transparent bg-zinc-50 hover:bg-zinc-100 text-zinc-750' : 'border border-transparent hover:bg-zinc-900/40 text-zinc-400')
+                                }`}
+                              >
+                                <div className="flex items-center space-x-1.5 truncate max-w-[170px]">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${isSelectedApp ? 'bg-gold-400 scale-110 animate-ping shadow-sm' : 'bg-zinc-650'}`}></span>
+                                  <span className="truncate">{app.name}</span>
+                                </div>
+                                <span className="font-mono font-bold text-right shrink-0">{pts} Pts</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
                       {/* Interactive Watch Video Banner Trigger */}
                       <div className={`p-4 rounded-xl flex flex-col items-center text-center space-y-2.5 transition-all ${
                         themeMode === 'light' 
@@ -1684,23 +2130,47 @@ export default function App() {
                           : 'bg-gradient-to-br from-[#121212] to-[#040404] border border-gold-500/10'
                       }`}>
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${themeMode === 'light' ? 'bg-gold-500/10' : 'bg-gold-400/5 border border-gold-400/15'}`}>
-                          <Video className="w-5 h-5 text-gold-400 animate-pulse" />
+                          {rewardedCooldownLeft > 0 ? (
+                            <Clock className="w-5 h-5 text-amber-500 animate-pulse" />
+                          ) : (
+                            <Video className="w-5 h-5 text-gold-400 animate-pulse" />
+                          )}
                         </div>
                         <div className="space-y-1">
                           <h4 className={`text-xs font-serif font-black tracking-wide uppercase ${themeMode === 'light' ? 'text-zinc-800' : 'text-[#f5edcb]'}`}>
-                            {t.needMorePoints}
+                            {rewardedCooldownLeft > 0 ? t.cooldownStatus : t.needMorePoints}
                           </h4>
                           <p className={`text-[10px] leading-relaxed font-sans ${themeMode === 'light' ? 'text-zinc-650' : 'text-zinc-500'}`}>
-                            {t.watchAdToEarn}
+                            {rewardedCooldownLeft > 0 
+                              ? (language === 'am' ? 'የቪዲዮ ማስታወቂያ እረፍት ላይ ነው። እባክዎ ለሚቀጥለው ነጥብ ጥቂት ሰከንዶች ይጠብቁ!' : 'Spaced out rewarded campaign to maximize payout rates. Watch next limit:') 
+                              : t.watchAdToEarn}
                           </p>
                         </div>
-                        <button
-                          onClick={startAdMobVideoPlayback}
-                          className="w-full mt-1 px-4 py-2 bg-gradient-to-r from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 text-black text-[10px] font-black tracking-widest uppercase rounded flex items-center justify-center space-x-1.5 transition-all shadow-md shadow-gold-500/10 cursor-pointer active:scale-98"
-                        >
-                          <Play className="w-3 h-3 fill-current text-black stroke-[3]" />
-                          <span>{t.watchAdBtn} (+5)</span>
-                        </button>
+                        {rewardedCooldownLeft > 0 ? (
+                          <div className="w-full space-y-2">
+                            <div className="py-2 px-4 bg-zinc-900 border border-zinc-800 text-gold-400 font-mono text-[10px] font-bold rounded flex items-center justify-center space-x-1.5 shadow-inner">
+                              <Clock className="w-3.5 h-3.5 animate-spin-slow" />
+                              <span>{Math.floor(rewardedCooldownLeft / 60)}m {rewardedCooldownLeft % 60}s remaining</span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setRewardedCooldownLeft(0);
+                                addLog('system', 'Developer Bypass: Bypassed rewarded video cooldown.');
+                              }}
+                              className="w-full py-1 text-center bg-transparent border-dashed border border-amber-500/30 hover:border-amber-500/60 text-amber-500/80 hover:text-amber-400 text-[8.5px] font-mono rounded tracking-wider cursor-pointer transition-colors"
+                            >
+                              ⚡ BYPASS COOLDOWN (TEST SHORTCUT)
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={startAdMobVideoPlayback}
+                            className="w-full mt-1 px-4 py-2 bg-gradient-to-r from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 text-black text-[10px] font-black tracking-widest uppercase rounded flex items-center justify-center space-x-1.5 transition-all shadow-md shadow-gold-500/10 cursor-pointer active:scale-98"
+                          >
+                            <Play className="w-3 h-3 fill-current text-black stroke-[3]" />
+                            <span>{t.watchAdBtn} (+5)</span>
+                          </button>
+                        )}
                       </div>
 
                       {/* Micro Sandbox Status */}
@@ -1725,23 +2195,47 @@ export default function App() {
                           : 'bg-gradient-to-br from-[#121212] to-[#040404] border border-gold-500/10'
                       }`}>
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${themeMode === 'light' ? 'bg-gold-500/10' : 'bg-gold-400/5 border border-gold-400/15'}`}>
-                          <Video className="w-5 h-5 text-gold-400 animate-pulse" />
+                          {rewardedCooldownLeft > 0 ? (
+                            <Clock className="w-5 h-5 text-amber-500 animate-pulse" />
+                          ) : (
+                            <Video className="w-5 h-5 text-gold-400 animate-pulse" />
+                          )}
                         </div>
                         <div className="space-y-1">
                           <h4 className={`text-xs font-serif font-black tracking-wide uppercase ${themeMode === 'light' ? 'text-zinc-800' : 'text-[#f5edcb]'}`}>
-                            {t.needMorePoints}
+                            {rewardedCooldownLeft > 0 ? t.cooldownStatus : t.needMorePoints}
                           </h4>
-                          <p className={`text-[10px] leading-relaxed font-sans ${themeMode === 'light' ? 'text-zinc-600' : 'text-zinc-500'}`}>
-                            {t.watchAdToEarn}
+                          <p className={`text-[10px] leading-relaxed font-sans ${themeMode === 'light' ? 'text-zinc-650' : 'text-zinc-500'}`}>
+                            {rewardedCooldownLeft > 0 
+                              ? (language === 'am' ? 'የቪዲዮ ማስታወቂያ እረፍት ላይ ነው። እባክዎ ለሚቀጥለው ነጥብ ጥቂት ሰከንዶች ይጠብቁ!' : 'Spaced out rewarded campaign to maximize payout rates. Watch next limit:') 
+                              : t.watchAdToEarn}
                           </p>
                         </div>
-                        <button
-                          onClick={startAdMobVideoPlayback}
-                          className="w-full mt-1 px-4 py-2 bg-gradient-to-r from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 text-black text-[10px] font-black tracking-widest uppercase rounded flex items-center justify-center space-x-1.5 transition-all shadow-md shadow-gold-500/10 cursor-pointer active:scale-98"
-                        >
-                          <Play className="w-3 h-3 fill-current text-black stroke-[3]" />
-                          <span>{t.watchAdBtn} (+5)</span>
-                        </button>
+                        {rewardedCooldownLeft > 0 ? (
+                          <div className="w-full space-y-2">
+                            <div className="py-2 px-4 bg-zinc-900 border border-zinc-800 text-gold-400 font-mono text-[10px] font-bold rounded flex items-center justify-center space-x-1.5 shadow-inner">
+                              <Clock className="w-3.5 h-3.5 animate-spin-slow" />
+                              <span>{Math.floor(rewardedCooldownLeft / 60)}m {rewardedCooldownLeft % 60}s remaining</span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setRewardedCooldownLeft(0);
+                                addLog('system', 'Developer Bypass: Bypassed rewarded video cooldown.');
+                              }}
+                              className="w-full py-1 text-center bg-transparent border-dashed border border-amber-500/30 hover:border-amber-500/60 text-amber-500/80 hover:text-amber-400 text-[8.5px] font-mono rounded tracking-wider cursor-pointer transition-colors"
+                            >
+                              ⚡ BYPASS COOLDOWN (TEST SHORTCUT)
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={startAdMobVideoPlayback}
+                            className="w-full mt-1 px-4 py-2 bg-gradient-to-r from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 text-black text-[10px] font-black tracking-widest uppercase rounded flex items-center justify-center space-x-1.5 transition-all shadow-md shadow-gold-500/10 cursor-pointer active:scale-98"
+                          >
+                            <Play className="w-3 h-3 fill-current text-black stroke-[3]" />
+                            <span>{t.watchAdBtn} (+5)</span>
+                          </button>
+                        )}
                       </div>
 
                       {/* Marketplace list */}
@@ -1918,22 +2412,32 @@ export default function App() {
                     <div className="space-y-4 pb-20 animate-fade-in">
                       
                       {/* STATS AREA */}
-                      <div className="bg-[#0c0c0c] border border-zinc-900 rounded-xl p-4 space-y-3">
+                      <div className={`border rounded-xl p-4 space-y-3 transition-all ${
+                        themeMode === 'light' ? 'bg-white border-zinc-200 shadow-sm text-zinc-805' : 'bg-[#0c0c0c] border-zinc-900 text-zinc-200'
+                      }`}>
                         <div className="text-center space-y-1">
                           <span className="text-[9px] uppercase font-serif font-extrabold text-zinc-500 tracking-wider">Your Referral Promo Code</span>
-                          <div className="text-base font-black font-mono text-gold-400 bg-[#020202] py-2 px-4 rounded-lg flex items-center justify-center space-x-2 border border-zinc-90 w-fit mx-auto shadow-inner">
+                          <div className={`text-base font-black font-mono py-2 px-4 rounded-lg flex items-center justify-center space-x-2 border w-fit mx-auto shadow-inner ${
+                            themeMode === 'light' 
+                              ? 'text-amber-600 bg-zinc-50 border-zinc-200' 
+                              : 'text-gold-400 bg--[#020202] border-zinc-90'
+                          }`}>
                             <span>{currentUser.myReferralCode}</span>
                           </div>
                         </div>
 
-                        <div className="border-t border-zinc-900 pt-2.5 flex justify-between text-center select-none text-[10px] font-mono">
-                          <div className="flex-1 border-r border-zinc-900 pr-2">
+                        <div className={`border-t pt-2.5 flex justify-between text-center select-none text-[10px] font-mono ${
+                          themeMode === 'light' ? 'border-zinc-200' : 'border-zinc-900'
+                        }`}>
+                          <div className={`flex-1 border-r pr-2 ${themeMode === 'light' ? 'border-zinc-200' : 'border-zinc-900'}`}>
                             <p className="text-zinc-500 text-[9px] font-sans">Promo Credit</p>
                             <p className="text-emerald-400 font-bold font-mono">+100 Pts</p>
                           </div>
                           <div className="flex-1 pl-2">
                             <p className="text-zinc-500 text-[9px] font-sans">Introduced By</p>
-                            <p className="text-zinc-350 truncate max-w-[100px] font-mono font-semibold">
+                            <p className={`truncate max-w-[100px] font-mono font-semibold ${
+                              themeMode === 'light' ? 'text-zinc-750' : 'text-zinc-350'
+                            }`}>
                               {currentUser.referredBy === 'none' 
                                 ? 'No referrer' 
                                 : users.find(u => u.uid === currentUser.referredBy)?.name || currentUser.referredBy
@@ -1944,8 +2448,12 @@ export default function App() {
                       </div>
 
                       {/* ENTER INVITATION CODE FORM */}
-                      <form onSubmit={handleReferralSubmission} className="space-y-3 bg-[#0c0c0c] border border-zinc-900 p-4 rounded-xl">
-                        <h4 className="text-xs font-serif font-black uppercase text-gold-400 tracking-wider">Validate Invite promo</h4>
+                      <form onSubmit={handleReferralSubmission} className={`space-y-3 p-4 rounded-xl border transition-all ${
+                        themeMode === 'light' ? 'bg-white border-zinc-200 shadow-sm text-zinc-800' : 'bg-[#0c0c0c] border-zinc-900 text-zinc-100'
+                      }`}>
+                        <h4 className={`text-xs font-serif font-black uppercase tracking-wider ${
+                          themeMode === 'light' ? 'text-amber-600' : 'text-gold-400'
+                        }`}>Validate Invite promo</h4>
                         <p className="text-[10px] text-zinc-500 leading-relaxed font-sans">Insert a friend's active code below. Valid once per document session. Generates mutual +100 point credits.</p>
 
                         <div className="space-y-1.5">
@@ -1955,7 +2463,11 @@ export default function App() {
                             onChange={(e) => setEnteredReferralCode(e.target.value)}
                             disabled={currentUser.referredBy !== 'none'}
                             placeholder={currentUser.referredBy !== 'none' ? "Code already validated" : "Promo e.g. REE7491"}
-                            className="w-full bg-[#050505] border border-zinc-900 rounded-lg p-2 text-center font-mono uppercase font-bold text-xs text-[#f5edcb] placeholder-zinc-700 focus:outline-none focus:border-gold-500/40 disabled:cursor-not-allowed disabled:opacity-40"
+                            className={`w-full rounded-lg p-2 text-center font-mono uppercase font-bold text-xs placeholder-zinc-450 focus:outline-none transition-all disabled:cursor-not-allowed disabled:opacity-40 border ${
+                              themeMode === 'light'
+                                ? 'bg-zinc-50 border-zinc-200 text-zinc-800 focus:border-amber-500/55'
+                                : 'bg-[#050505] border-zinc-900 text-[#f5edcb] focus:border-gold-500/40'
+                            }`}
                           />
                         </div>
 
@@ -1972,7 +2484,13 @@ export default function App() {
                         <button
                           type="submit"
                           disabled={currentUser.referredBy !== 'none'}
-                          className="w-full bg-gradient-to-r from-gold-600 to-gold-400 disabled:from-zinc-950 disabled:to-zinc-950 disabled:text-zinc-700 border border-gold-500/10 disabled:border-zinc-900 text-black font-bold py-2 text-xs rounded transition-all cursor-pointer"
+                          className={`w-full font-bold py-2 text-xs rounded transition-all cursor-pointer border ${
+                            currentUser.referredBy !== 'none'
+                              ? 'bg-zinc-950/20 text-zinc-500 border-zinc-500/15 cursor-not-allowed'
+                              : (themeMode === 'light'
+                                  ? 'bg-gradient-to-r from-amber-600 to-amber-500 text-white border-transparent shadow shadow-amber-500/10'
+                                  : 'bg-gradient-to-r from-gold-600 to-gold-400 text-black border-gold-500/10 shadow shadow-gold-500/10')
+                          }`}
                         >
                           {currentUser.referredBy !== 'none' ? 'Promo Code Utilized' : 'Authorize Invitation'}
                         </button>
@@ -1983,7 +2501,11 @@ export default function App() {
                         <h5 className="text-[9px] uppercase font-serif font-extrabold text-zinc-500 tracking-widest">Active Connections</h5>
                         
                         {referrals.filter(r => r.referrerUid === currentUser.uid || r.referredUid === currentUser.uid).length === 0 ? (
-                          <p className="text-[9px] text-zinc-600 text-center py-4 bg-[#0a0a0a]/30 rounded border border-zinc-900 border-dashed font-sans">
+                          <p className={`text-[9px] text-center py-4 rounded border border-dashed font-sans ${
+                            themeMode === 'light'
+                              ? 'bg-zinc-50 border-zinc-205 text-zinc-500'
+                              : 'bg-[#0a0a0a]/30 border-zinc-900 text-zinc-650'
+                          }`}>
                             No invite records found. Invite companions using your code!
                           </p>
                         ) : (
@@ -1994,10 +2516,12 @@ export default function App() {
                               const role = ref.referrerUid === currentUser.uid ? 'Host Referrer' : 'Introduced user';
                               
                               return (
-                                <div key={idx} className="bg-[#0b0b0b] p-2 border border-zinc-900 rounded flex justify-between items-center text-[10px]">
+                                <div key={idx} className={`p-2 border rounded flex justify-between items-center text-[10px] transition-all ${
+                                  themeMode === 'light' ? 'bg-zinc-100/50 border-zinc-200' : 'bg-[#0b0b0b] border-zinc-900'
+                                }`}>
                                   <div>
-                                    <p className="font-semibold text-zinc-300 font-sans truncate max-w-[130px]">{partnerName}</p>
-                                    <span className="text-[8px] text-gold-400 font-mono italic">{role}</span>
+                                    <p className={`font-semibold font-sans truncate max-w-[130px] ${themeMode === 'light' ? 'text-zinc-800' : 'text-zinc-300'}`}>{partnerName}</p>
+                                    <span className={`text-[8px] font-mono italic ${themeMode === 'light' ? 'text-amber-600 font-bold' : 'text-gold-400'}`}>{role}</span>
                                   </div>
                                   <div className="bg-emerald-500/5 text-emerald-400 font-mono font-bold px-1.5 py-0.5 rounded border border-emerald-500/10 text-[9px]">
                                     +100 Pts
@@ -2012,110 +2536,489 @@ export default function App() {
                     </div>
                   )}
 
+                  {/* ARCADE / PLAY ZONE (SCREEN 4.5 - NEW ADDITION) */}
+                  {mobileScreen === 'game' && currentUser && (
+                    <div className="space-y-4 pb-24 animate-fade-in text-left">
+                      
+                      {/* Active Multiplier Promo Banner */}
+                      <div className={`p-3.5 rounded-2xl text-center space-y-1.5 border transition-all ${
+                        boostTimeLeft > 0 
+                          ? 'bg-gradient-to-tr from-amber-500/20 to-orange-500/10 border-amber-500/40 text-amber-100 shadow-lg animate-pulse'
+                          : themeMode === 'light'
+                            ? 'bg-gradient-to-tr from-zinc-50 to-white border-zinc-200 text-zinc-800'
+                            : 'bg-zinc-950/40 border-zinc-900 text-zinc-300'
+                      }`}>
+                        {boostTimeLeft > 0 ? (
+                          <div className="flex flex-col items-center justify-center space-y-1">
+                            <div className="flex items-center space-x-1">
+                              <Flame className="w-5 h-5 text-amber-500 fill-amber-500 animate-bounce" />
+                              <span className="font-serif font-black uppercase text-xs tracking-wider text-amber-400 text-center">
+                                {t.doublePointsActive}
+                              </span>
+                            </div>
+                            <p className="text-[9px] text-zinc-400 font-mono text-center">
+                              Multiplier duration: {Math.floor(boostTimeLeft / 60)}m {boostTimeLeft % 60}s left
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center space-y-1 text-center">
+                            <span className="font-serif font-black uppercase text-[10px] tracking-wide text-zinc-400">
+                              No Point Booster Active
+                            </span>
+                            <p className="text-[9px] text-zinc-500 max-w-[200px] leading-tight font-sans">
+                              Watch a rewarded video in the Dashboard or Store to unlock 2x Points multiplier & Premium levels!
+                            </p>
+                            {rewardedCooldownLeft > 0 ? (
+                              <div className="text-[8px] font-mono text-amber-500 bg-amber-500/5 px-2 py-0.5 rounded border border-amber-500/15 mt-1">
+                                Ad Cooldown: {Math.floor(rewardedCooldownLeft / 60)}m {rewardedCooldownLeft % 60}s
+                              </div>
+                            ) : (
+                              <button
+                                onClick={startAdMobVideoPlayback}
+                                className="mt-1 px-3 py-1 bg-gradient-to-r from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 text-black text-[8px] font-black tracking-widest uppercase rounded flex items-center justify-center space-x-1 cursor-pointer transition-all active:scale-95 border-none"
+                              >
+                                <span>Get Booster (+5 Pts)</span>
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Game Mode Selector Tabs */}
+                      <div className="flex bg-zinc-950/60 p-1 rounded-xl border border-zinc-900/80 justify-around select-none">
+                        <button
+                          onClick={() => setGameMode('trivia')}
+                          className={`flex-1 text-center py-1.5 text-[9.5px] font-bold rounded-lg transition-all border-none bg-transparent cursor-pointer ${
+                            gameMode === 'trivia'
+                              ? 'bg-zinc-800 text-gold-400 shadow-md font-black'
+                              : 'text-zinc-500 hover:text-zinc-300'
+                          }`}
+                        >
+                          {t.triviaQuest}
+                        </button>
+                        <button
+                          onClick={() => setGameMode('tapper')}
+                          className={`flex-1 text-center py-1.5 text-[9.5px] font-bold rounded-lg transition-all border-none bg-transparent cursor-pointer ${
+                            gameMode === 'tapper'
+                              ? 'bg-zinc-800 text-gold-400 shadow-md font-black'
+                              : 'text-zinc-500 hover:text-zinc-300'
+                          }`}
+                        >
+                          {t.coinTapper}
+                        </button>
+                      </div>
+
+                      {/* MODE A: TRIVIA CHALLENGE */}
+                      {gameMode === 'trivia' && (
+                        <div className={`p-4 rounded-xl border space-y-3.5 transition-all ${
+                          themeMode === 'light' ? 'bg-white border-zinc-200' : 'bg-black/40 border-zinc-900'
+                        }`}>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[8px] font-mono font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded px-1.5 py-0.5 tracking-wider uppercase">
+                              Level {activeTriviaIndex + 1}
+                            </span>
+                            <span className="text-[8px] font-mono text-zinc-500">
+                              Question {activeTriviaIndex + 1} of {TRIVIA_QUESTIONS.length}
+                            </span>
+                          </div>
+
+                          {/* Question text */}
+                          <p className={`text-[11.5px] font-bold leading-relaxed ${themeMode === 'light' ? 'text-zinc-850' : 'text-zinc-100'}`}>
+                            {language === 'am' ? TRIVIA_QUESTIONS[activeTriviaIndex].am.question : TRIVIA_QUESTIONS[activeTriviaIndex].en.question}
+                          </p>
+
+                          {/* Options Grid */}
+                          <div className="space-y-2">
+                            {(() => {
+                              const currentQ = language === 'am' ? TRIVIA_QUESTIONS[activeTriviaIndex].am : TRIVIA_QUESTIONS[activeTriviaIndex].en;
+                              return currentQ.options.map((option, idx) => {
+                                let optionStyle = "border-zinc-800 hover:bg-zinc-900 hover:border-zinc-700";
+                                if (themeMode === 'light') {
+                                  optionStyle = "border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 text-zinc-700";
+                                }
+
+                                if (selectedAnswerIndex === idx) {
+                                  optionStyle = "border-amber-500 bg-amber-500/10 text-amber-400";
+                                }
+
+                                if (answerSubmitted) {
+                                  if (idx === currentQ.correctIndex) {
+                                    optionStyle = "border-emerald-550 bg-emerald-500/15 text-emerald-400 font-extrabold";
+                                  } else if (selectedAnswerIndex === idx) {
+                                    optionStyle = "border-rose-550 bg-rose-500/15 text-rose-450";
+                                  } else {
+                                    optionStyle = "opacity-40 border-zinc-900";
+                                  }
+                                }
+
+                                return (
+                                  <button
+                                    key={idx}
+                                    disabled={answerSubmitted}
+                                    onClick={() => handleTriviaAnswerSelect(idx)}
+                                    className={`w-full p-2.5 text-left text-[10px] rounded-lg border font-medium transition-all duration-200 flex justify-between items-center cursor-pointer bg-transparent ${optionStyle}`}
+                                  >
+                                    <span>{option}</span>
+                                    {answerSubmitted && idx === currentQ.correctIndex && (
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                    )}
+                                    {answerSubmitted && selectedAnswerIndex === idx && idx !== currentQ.correctIndex && (
+                                      <X className="w-3.5 h-3.5 text-rose-400" />
+                                    )}
+                                  </button>
+                                );
+                              });
+                            })()}
+                          </div>
+
+                          {/* Verify/Next Button */}
+                          {!answerSubmitted ? (
+                            <button
+                              disabled={selectedAnswerIndex === null}
+                              onClick={handleTriviaVerification}
+                              className={`w-full py-2 rounded font-black font-sans uppercase text-[10.5px] tracking-wide transition-all border-none flex items-center justify-center space-x-1.5 ${
+                                selectedAnswerIndex === null
+                                  ? 'bg-zinc-850 text-zinc-500 cursor-not-allowed opacity-50'
+                                  : 'bg-[#e5b83b] hover:bg-[#d4af37] text-black cursor-pointer'
+                              }`}
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>{t.selectAnswer}</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={handleNextTriviaQuestion}
+                              className="w-full py-2 bg-[#e5b83b] hover:bg-[#d4af37] text-black rounded font-black font-sans uppercase text-[10.5px] tracking-wide transition-all cursor-pointer flex items-center justify-center space-x-1 border-none"
+                            >
+                              <span>{language === 'am' ? 'ቀጣይ ጥያቄ' : 'Next Level'}</span>
+                              <ChevronRight className="w-3.5 h-3.5 stroke-[3]" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* MODE B: GOLDEN COIN TAPPER */}
+                      {gameMode === 'tapper' && (
+                        <div className={`p-4 rounded-xl border space-y-3.5 transition-all flex flex-col items-center ${
+                          themeMode === 'light' ? 'bg-white border-zinc-200' : 'bg-black/40 border-zinc-900'
+                        }`}>
+                          <div className="flex justify-between items-center w-full">
+                            <span className="text-[8px] font-mono text-zinc-500">
+                              {language === 'am' ? 'የፍጥነት መለኪያ ጨዋታ' : 'Reflex Multiplier Arena'}
+                            </span>
+                            <span className="text-[9px] font-mono text-gold-500 font-bold">
+                              Score: {tapScore} Pts Gained
+                            </span>
+                          </div>
+
+                          <p className={`text-[10px] text-center leading-relaxed font-sans ${themeMode === 'light' ? 'text-zinc-650' : 'text-zinc-400'}`}>
+                            {language === 'am' 
+                              ? 'ሲገለጥ ወርቃማውን ሳንቲም በፍጥነት በመንካት ነጥብ ይሰብስቡ!' 
+                              : 'Tap the glowing golden cell immediately when it lights up to claim your reward points!'}
+                          </p>
+
+                          {/* Grid cells (6 cells: 2 columns, 3 rows) */}
+                          <div className="grid grid-cols-3 gap-2 w-full mt-2">
+                            {Array.from({ length: 6 }).map((_, cellIdx) => {
+                              const isActive = cellIdx === activeCoinCell;
+                              return (
+                                <button
+                                  key={cellIdx}
+                                  onClick={() => handleCoinTap(cellIdx)}
+                                  className={`aspect-square rounded-xl flex items-center justify-center transition-all duration-150 border relative overflow-hidden bg-transparent cursor-pointer ${
+                                    isActive
+                                      ? 'border-amber-500 bg-amber-500/10 shadow-lg shadow-amber-500/20 scale-102 ring-1 ring-amber-400'
+                                      : 'border-zinc-800 bg-zinc-950/20 opacity-80 hover:bg-zinc-900/10'
+                                  }`}
+                                >
+                                  {isActive && (
+                                    <>
+                                      <div className="absolute inset-0 bg-gradient-radial from-amber-500/30 to-transparent animate-ping"></div>
+                                      <Coins className="w-6 h-6 text-amber-400 fill-amber-400 stroke-[2] animate-bounce" />
+                                    </>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Quick statistics */}
+                          {boostTimeLeft > 0 && (
+                            <div className="flex items-center space-x-1 pt-1.5 text-amber-500 font-sans text-[9.5px] font-semibold animate-pulse">
+                              <Sparkles className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                              <span>⚡ Points Doubled (+2 per coin tap!)</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* SYSTEM & NETWORK SETTINGS (SCREEN 4) */}
                   {mobileScreen === 'setting' && currentUser && (
                     <div className="space-y-4 pb-20 animate-fade-in">
                       
-                      {/* Interactive App controls */}
-                      <div className={`p-4 rounded-xl space-y-3.5 transition-all border ${
-                        themeMode === 'light' ? 'bg-white border-zinc-200 shadow-sm' : 'bg-[#0c0c0c] border-zinc-900'
-                      }`}>
-                        
-                        {/* Theme Toggle option */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <Layers className="w-4 h-4 text-zinc-400" />
-                            <div className="text-left">
-                              <p className={`text-[11px] font-bold ${themeMode === 'light' ? 'text-zinc-800' : 'text-zinc-200'}`}>{language === 'am' ? 'ገጽታ' : 'App Theme'}</p>
-                              <p className="text-[9px] text-zinc-500">{themeMode === 'light' ? 'Light Theme Active' : 'Dark Theme Active'}</p>
+                      {settingSubView === 'main' ? (
+                        <>
+                          {/* Interactive App controls */}
+                          <div className={`p-4 rounded-xl space-y-3.5 transition-all border ${
+                            themeMode === 'light' ? 'bg-white border-zinc-200 shadow-sm' : 'bg-[#0c0c0c] border-zinc-900'
+                          }`}>
+                            
+                            {/* Theme Toggle option */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2">
+                                <Layers className="w-4 h-4 text-zinc-400" />
+                                <div className="text-left">
+                                  <p className={`text-[11px] font-bold ${themeMode === 'light' ? 'text-zinc-800' : 'text-zinc-200'}`}>{language === 'am' ? 'ገጽታ' : 'App Theme'}</p>
+                                  <p className="text-[9px] text-zinc-500">{themeMode === 'light' ? 'Light Theme Active' : 'Dark Theme Active'}</p>
+                                </div>
+                              </div>
+                              
+                              {/* Toggle Switch */}
+                              <button
+                                onClick={() => setThemeMode(themeMode === 'light' ? 'dark' : 'light')}
+                                className={`w-[36px] h-[22px] rounded-full p-0.5 transition-colors relative focus:outline-none flex items-center cursor-pointer ${
+                                  themeMode === 'light' ? 'bg-amber-500 text-white' : 'bg-zinc-800 border border-zinc-700'
+                                }`}
+                              >
+                                <div className={`w-4 h-4 rounded-full bg-white transition-all transform ${
+                                  themeMode === 'light' ? 'translate-x-[14px]' : 'translate-x-0'
+                                }`} />
+                              </button>
                             </div>
+
+                            {/* Language Selection option */}
+                            <div className="flex items-center justify-between border-t border-zinc-900/10 pt-3">
+                              <div className="flex items-center space-x-2">
+                                <Compass className="w-4 h-4 text-zinc-400" />
+                                <div className="text-left">
+                                  <p className={`text-[11px] font-bold ${themeMode === 'light' ? 'text-zinc-800' : 'text-zinc-200'}`}>{language === 'am' ? 'ቋንቋ' : 'Language'}</p>
+                                  <p className="text-[9px] text-zinc-500">{language === 'en' ? 'English (US)' : 'አማርኛ (Ethiopia)'}</p>
+                                </div>
+                              </div>
+
+                              {/* Language Choice buttons */}
+                              <div className={`flex space-x-1 p-0.5 rounded-md border ${
+                                themeMode === 'light' ? 'bg-zinc-100 border-zinc-200' : 'bg-black/20 border-zinc-850'
+                              }`}>
+                                <button
+                                  onClick={() => setLanguage('en')}
+                                  className={`px-2 py-0.5 text-[9px] font-extrabold rounded cursor-pointer transition-all ${
+                                    language === 'en' 
+                                      ? (themeMode === 'light' ? 'bg-amber-500 text-white font-black shadow-sm' : 'bg-gold-400 text-black font-black') 
+                                      : (themeMode === 'light' ? 'text-zinc-500 hover:text-zinc-800 animate-none' : 'text-zinc-500 hover:text-zinc-400')
+                                  }`}
+                                >
+                                  EN
+                                </button>
+                                <button
+                                  onClick={() => setLanguage('am')}
+                                  className={`px-2 py-0.5 text-[9px] font-extrabold rounded cursor-pointer transition-all ${
+                                    language === 'am' 
+                                      ? (themeMode === 'light' ? 'bg-amber-500 text-white font-black shadow-sm' : 'bg-gold-400 text-black font-black') 
+                                      : (themeMode === 'light' ? 'text-zinc-500 hover:text-zinc-800 animate-none' : 'text-zinc-500 hover:text-zinc-400')
+                                  }`}
+                                >
+                                  አማ
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* QA Speed Testing Accelerator Option */}
+                            <div className="flex items-center justify-between border-t border-zinc-900/10 pt-3">
+                              <div className="flex items-center space-x-2">
+                                <Zap className="w-4 h-4 text-amber-500 animate-pulse" />
+                                <div className="text-left">
+                                  <p className={`text-[11px] font-bold ${themeMode === 'light' ? 'text-[#040404]' : 'text-zinc-200'}`}>QA Speed Testing Mode</p>
+                                  <p className="text-[9px] text-zinc-500">Accelerates ad cooldown to 15s / multiplier to 30s</p>
+                                </div>
+                              </div>
+
+                              <button
+                                onClick={() => {
+                                  setActiveSpeedTesting(!activeSpeedTesting);
+                                  addLog('system', `QA Simulation: Toggled speed testing mode to ${!activeSpeedTesting ? 'ENABLED' : 'DISABLED'}`);
+                                }}
+                                className={`w-[36px] h-[22px] rounded-full p-0.5 transition-colors relative focus:outline-none flex items-center cursor-pointer ${
+                                  activeSpeedTesting ? 'bg-emerald-500' : 'bg-zinc-800 border border-zinc-700'
+                                }`}
+                              >
+                                <div className={`w-4 h-4 rounded-full bg-white transition-all transform ${
+                                  activeSpeedTesting ? 'translate-x-[14px]' : 'translate-x-0'
+                                }`} />
+                              </button>
+                            </div>
+
                           </div>
-                          
-                          {/* Toggle Switch */}
+
+                          {/* About Page Trigger Link */}
                           <button
-                            onClick={() => setThemeMode(themeMode === 'light' ? 'dark' : 'light')}
-                            className={`w-[36px] h-[22px] rounded-full p-0.5 transition-colors relative focus:outline-none flex items-center cursor-pointer ${
-                              themeMode === 'light' ? 'bg-amber-500' : 'bg-zinc-800 border border-zinc-700'
+                            onClick={() => setSettingSubView('about')}
+                            className={`w-full p-4 rounded-xl flex items-center justify-between transition-all border text-left cursor-pointer ${
+                              themeMode === 'light' ? 'bg-white border-zinc-200 shadow-sm hover:bg-zinc-50' : 'bg-[#0c0c0c] border-[#1c1c1c]/80 hover:bg-[#111]'
                             }`}
                           >
-                            <div className={`w-4 h-4 rounded-full bg-white transition-all transform ${
-                              themeMode === 'light' ? 'translate-x-[14px]' : 'translate-x-0'
-                            }`} />
-                          </button>
-                        </div>
-
-                        {/* Language Selection option */}
-                        <div className="flex items-center justify-between border-t border-zinc-900/10 pt-3">
-                          <div className="flex items-center space-x-2">
-                            <Compass className="w-4 h-4 text-zinc-400" />
-                            <div className="text-left">
-                              <p className={`text-[11px] font-bold ${themeMode === 'light' ? 'text-zinc-800' : 'text-zinc-200'}`}>{language === 'am' ? 'ቋንቋ' : 'Language'}</p>
-                              <p className="text-[9px] text-zinc-500">{language === 'en' ? 'English (US)' : 'አማርኛ (Ethiopia)'}</p>
+                            <div className="flex items-center space-x-2.5">
+                              <User className="w-4 h-4 text-gold-400 animate-pulse" />
+                              <div className="text-left">
+                                <p className={`text-[11px] font-bold ${themeMode === 'light' ? 'text-zinc-800' : 'text-zinc-200'}`}>{language === 'am' ? 'ስለ እኔ / ገለጻ' : 'About Me / Developer Info'}</p>
+                                <p className="text-[9px] text-zinc-500">bahreab feleke</p>
+                              </div>
                             </div>
+                            <ChevronRight className="w-4 h-4 text-zinc-400" />
+                          </button>
+
+                          {/* SYSTEM SETTINGS METADATA */}
+                          <div className={`border rounded-xl divide-y text-[10px] overflow-hidden transition-all ${
+                            themeMode === 'light' 
+                              ? 'bg-white border-zinc-205 divide-zinc-200 text-zinc-700' 
+                              : 'bg-[#0c0c0c] border-zinc-900 divide-zinc-900 text-zinc-400'
+                          }`}>
+                            
+                            <div className={`p-3 flex justify-between items-center transition-colors ${
+                              themeMode === 'light' ? 'bg-amber-500/5' : 'bg-gold-400/5'
+                            }`}>
+                              <span className="text-zinc-500 flex items-center space-x-1.5 font-semibold">
+                                <Award className={`w-3.5 h-3.5 ${themeMode === 'light' ? 'text-amber-600 animate-none' : 'text-gold-400'}`} />
+                                <span>Developer Creator</span>
+                              </span>
+                              <span className={`font-serif font-extrabold uppercase tracking-wide ${
+                                themeMode === 'light' ? 'text-amber-600' : 'text-gold-400'
+                              }`}>bahreab feleke</span>
+                            </div>
+                            <div className="p-3 flex justify-between items-center">
+                              <span className="text-zinc-500">Personal Referral Key</span>
+                              <span className={`font-mono font-bold ${
+                                themeMode === 'light' ? 'text-amber-650' : 'text-gold-400'
+                              }`}>{currentUser.myReferralCode}</span>
+                            </div>
+                            <div className="p-3 flex justify-between items-center">
+                              <span className="text-zinc-500">Document Parent Status</span>
+                              <span className="font-mono">
+                                {currentUser.referredBy === 'none' ? 'Primary Document' : 'Referral Child'}
+                              </span>
+                            </div>
+                            <div className="p-3 flex justify-between items-center">
+                              <span className="text-zinc-500">Sandbox Database State</span>
+                              <span className="text-emerald-400 flex items-center space-x-1 font-semibold">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+                                <span>Firestore Online</span>
+                              </span>
+                            </div>
+                            
                           </div>
 
-                          {/* Language Choice buttons */}
-                          <div className="flex space-x-1 p-0.5 bg-black/20 rounded-md border border-zinc-850">
-                            <button
-                              onClick={() => setLanguage('en')}
-                              className={`px-2 py-0.5 text-[9px] font-extrabold rounded cursor-pointer transition-colors ${
-                                language === 'en' ? 'bg-gold-400 text-black font-black' : 'text-zinc-500 hover:text-zinc-400'
-                              }`}
-                            >
-                              EN
-                            </button>
-                            <button
-                              onClick={() => setLanguage('am')}
-                              className={`px-2 py-0.5 text-[9px] font-extrabold rounded cursor-pointer transition-colors ${
-                                language === 'am' ? 'bg-gold-400 text-black font-black' : 'text-zinc-500 hover:text-zinc-400'
-                              }`}
-                            >
-                              አማ
-                            </button>
+                          {/* Log out of Profile Button */}
+                          <button
+                            onClick={() => {
+                              setActiveUid('');
+                              addLog('auth', `Auth Logout: Logged out profile details`);
+                              setMobileScreen('auth');
+                            }}
+                            className={`w-full border p-2.5 text-xs font-semibold rounded-lg flex items-center justify-center space-x-2 cursor-pointer transition-all ${
+                              themeMode === 'light'
+                                ? 'bg-red-50 hover:bg-red-100 border-red-200 text-red-600'
+                                : 'bg-[#1b1b1b] hover:bg-[#252525] border-zinc-850 text-red-400'
+                            }`}
+                          >
+                            <LogOut className="w-3.5 h-3.5 text-red-400" />
+                            <span>{t.signout}</span>
+                          </button>
+                        </>
+                      ) : (
+                        /* DEDICATED ABOUT ME SUB-VIEW SCREEN */
+                        <div className="space-y-4 animate-fade-in text-left">
+                          
+                          {/* Back to main setting header */}
+                          <button
+                            onClick={() => setSettingSubView('main')}
+                            className={`flex items-center space-x-1 text-[10px] uppercase tracking-wider font-extrabold transition-colors p-1 cursor-pointer ${
+                              themeMode === 'light' ? 'text-amber-600 hover:text-amber-500' : 'text-gold-300 hover:text-gold-200'
+                            }`}
+                          >
+                            <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                            <span>{language === 'am' ? 'ተመለስ' : 'Back to Settings'}</span>
+                          </button>
+
+                          {/* Premium developer bio card */}
+                          <div className={`p-5 rounded-2xl border relative overflow-hidden transition-all ${
+                            themeMode === 'light' 
+                              ? 'bg-gradient-to-b from-white to-zinc-50 border-zinc-200 shadow' 
+                              : 'bg-gradient-to-b from-[#0a0a0a] to-[#010101] border-zinc-900 shadow-xl'
+                          }`}>
+                            
+                            {/* Decorative gold ambient glow in dark mode */}
+                            {themeMode !== 'light' && (
+                              <div className="absolute right-0 top-0 w-24 h-24 bg-gold-400/5 rounded-full filter blur-xl pointer-events-none" />
+                            )}
+
+                            <div className="flex flex-col items-center text-center space-y-3">
+                              
+                              {/* Avatar placeholder / decorative badge */}
+                              <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-gold-600 to-amber-400 p-0.5 flex items-center justify-center shadow-lg">
+                                <div className={`w-full h-full rounded-full flex items-center justify-center font-serif text-lg font-black ${
+                                  themeMode === 'light' ? 'bg-white text-zinc-900' : 'bg-black text-gold-400'
+                                }`}>
+                                  BF
+                                </div>
+                              </div>
+
+                              <div className="space-y-0.5">
+                                <h3 className={`font-serif text-base font-black tracking-wide uppercase ${
+                                  themeMode === 'light' ? 'text-zinc-900' : 'text-[#f5edcb]'
+                                }`}>
+                                  bahreab feleke
+                                </h3>
+                                <p className="text-[9px] font-mono uppercase tracking-widest text-gold-500 weight-black font-extrabold">
+                                  Full-Stack Engineer & Creator
+                                </p>
+                              </div>
+
+                              <div className={`w-12 h-0.5 rounded-full ${themeMode === 'light' ? 'bg-zinc-200' : 'bg-zinc-850'}`} />
+
+                              {/* Personal detailed bio text */}
+                              <div className={`text-[10.5px] leading-relaxed font-sans ${themeMode === 'light' ? 'text-zinc-650' : 'text-zinc-400'}`}>
+                                <p>
+                                  {language === 'am' ? (
+                                    'እንኳን ደህና መጡ! እኔ ባህርአብ ፈለቀ (bahreab feleke) እባላለሁ። AdQuest የተሰኘውን ይህንን ዘመናዊ መተግበርያ ሙሉ በሙሉ የገነባሁት ሲሆን ፤ መተግበርያው የቀጣይ ትውልድ ስማርት የሽልማት ማስተላለፊያዎችን ፣ የግብዣ ስርዓቶችን እንዲሁም የአድሞብ ማስታወቂያዎችን በተጨባጭ የሚቀርጽ ነው።'
+                                  ) : (
+                                    "Hi, I'm Bahreab Feleke! I am the lead software architect behind AdQuest Rewards & Referrals Emulator. I design fluid client interfaces, highly integrated NoSQL database adapters, and interactive simulation structures with pixel-perfect modern visual layouts."
+                                  )}
+                                </p>
+                              </div>
+
+                              {/* Special stats or features */}
+                              <div className="grid grid-cols-2 gap-2 w-full pt-2">
+                                <div className={`p-2 rounded-lg text-center border ${
+                                  themeMode === 'light' ? 'bg-zinc-100/50 border-zinc-200' : 'bg-zinc-900/40 border-zinc-900'
+                                }`}>
+                                  <p className="text-[8px] text-zinc-500 uppercase tracking-wider font-mono">My Vision</p>
+                                  <p className={`text-[10px] font-bold mt-0.5 ${themeMode === 'light' ? 'text-zinc-800' : 'text-zinc-200'}`}>Clean Craft</p>
+                                </div>
+                                <div className={`p-2 rounded-lg text-center border ${
+                                  themeMode === 'light' ? 'bg-zinc-100/50 border-zinc-200' : 'bg-zinc-900/40 border-zinc-900'
+                                }`}>
+                                  <p className="text-[8px] text-zinc-500 uppercase tracking-wider font-mono">Expertise</p>
+                                  <p className={`text-[10px] font-bold mt-0.5 ${themeMode === 'light' ? 'text-zinc-800' : 'text-zinc-200'}`}>Mobile & Web</p>
+                                </div>
+                              </div>
+
+                              <div className="pt-2 w-full">
+                                <button
+                                  onClick={() => setSettingSubView('main')}
+                                  className="w-full bg-gold-400 hover:bg-gold-300 text-black p-2 rounded-lg text-[10px] font-extrabold uppercase tracking-wide cursor-pointer text-center"
+                                >
+                                  {language === 'am' ? 'እሺ' : 'Dismiss'}
+                                </button>
+                              </div>
+
+                            </div>
+
                           </div>
-                        </div>
 
-                      </div>
-
-                      {/* SYSTEM SETTINGS METADATA */}
-                      <div className={`border rounded-xl divide-y text-[10px] overflow-hidden transition-all ${
-                        themeMode === 'light' 
-                          ? 'bg-white border-zinc-205 divide-zinc-200 text-zinc-700' 
-                          : 'bg-[#0c0c0c] border-zinc-900 divide-zinc-900 text-zinc-400'
-                      }`}>
-                        
-                        <div className="p-3 flex justify-between items-center">
-                          <span className="text-zinc-500">Personal Referral Key</span>
-                          <span className="font-mono text-gold-400 font-bold">{currentUser.myReferralCode}</span>
                         </div>
-                        <div className="p-3 flex justify-between items-center">
-                          <span className="text-zinc-500">Document Parent Status</span>
-                          <span className="font-mono">
-                            {currentUser.referredBy === 'none' ? 'Primary Document' : 'Referral Child'}
-                          </span>
-                        </div>
-                        <div className="p-3 flex justify-between items-center">
-                          <span className="text-zinc-500">Sandbox Database State</span>
-                          <span className="text-emerald-400 flex items-center space-x-1 font-semibold">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
-                            <span>Firestore Online</span>
-                          </span>
-                        </div>
-                        
-                      </div>
-
-                      {/* Log out of Profile Button */}
-                      <button
-                        onClick={() => {
-                          setActiveUid('');
-                          addLog('auth', `Auth Logout: Logged out profile details`);
-                          setMobileScreen('auth');
-                        }}
-                        className="w-full bg-[#1b1b1b] hover:bg-[#252525] border border-zinc-850 text-red-400 p-2.5 text-xs font-semibold rounded-lg flex items-center justify-center space-x-2 cursor-pointer transition-colors"
-                      >
-                        <LogOut className="w-3.5 h-3.5 text-red-400" />
-                        <span>{t.signout}</span>
-                      </button>
+                      )}
 
                     </div>
                   )}
@@ -2125,61 +3028,74 @@ export default function App() {
                 {/* 3. FLOATING BOTTOM NAVIGATION BAR (Glossy capsule hovering above content) */}
                 {mobileScreen !== 'auth' && currentUser && (
                   <div className="absolute bottom-4 left-4 right-4 z-40 select-none">
-                    <nav className={`p-2 rounded-2xl flex justify-around items-center border shadow-xl backdrop-blur-md transition-all duration-300 ${
+                    <nav className={`p-1.5 rounded-2xl flex justify-between items-center border shadow-xl backdrop-blur-md transition-all duration-300 ${
                       themeMode === 'light' 
                         ? 'bg-white/95 border-zinc-200 text-zinc-700 shadow-zinc-300/40' 
                         : 'bg-black/90 border-[#1c1c1c]/80 text-zinc-400 shadow-black/85'
                     }`}>
                       {/* DASHBOARD TAB */}
                       <button
-                        onClick={() => setMobileScreen('dashboard')}
-                        className={`flex flex-col items-center py-1 px-2.5 space-y-0.5 rounded-xl transition-all border-none bg-transparent cursor-pointer ${
+                        onClick={() => handleMobileScreenChange('dashboard')}
+                        className={`flex-1 flex flex-col items-center py-1 px-1.5 space-y-0.5 rounded-xl transition-all border-none bg-transparent cursor-pointer ${
                           mobileScreen === 'dashboard'
                             ? (themeMode === 'light' ? 'text-amber-600 bg-amber-500/10 font-bold' : 'text-gold-400 bg-gold-400/10 font-bold')
                             : 'opacity-70 hover:opacity-100'
                         }`}
                       >
                         <Home className="w-4 h-4 transition-colors" />
-                        <span className="text-[7.5px] tracking-wide font-sans font-black uppercase text-center">{t.dashboard}</span>
+                        <span className="text-[7px] tracking-wide font-sans font-black uppercase text-center">{t.dashboard}</span>
                       </button>
 
                       {/* STORE TAB */}
                       <button
-                        onClick={() => setMobileScreen('store')}
-                        className={`flex flex-col items-center py-1 px-2.5 space-y-0.5 rounded-xl transition-all border-none bg-transparent cursor-pointer ${
+                        onClick={() => handleMobileScreenChange('store')}
+                        className={`flex-1 flex flex-col items-center py-1 px-1.5 space-y-0.5 rounded-xl transition-all border-none bg-transparent cursor-pointer ${
                           mobileScreen === 'store'
                             ? (themeMode === 'light' ? 'text-amber-600 bg-amber-500/10 font-bold' : 'text-gold-400 bg-gold-400/10 font-bold')
                             : 'opacity-70 hover:opacity-100'
                         }`}
                       >
                         <ShoppingBag className="w-4 h-4 transition-colors" />
-                        <span className="text-[7.5px] tracking-wide font-sans font-black uppercase text-center">{t.store}</span>
+                        <span className="text-[7px] tracking-wide font-sans font-black uppercase text-center">{t.store}</span>
+                      </button>
+
+                      {/* ARCADE / INTERACTIVE PLAY ZONE TAB */}
+                      <button
+                        onClick={() => handleMobileScreenChange('game')}
+                        className={`flex-1 flex flex-col items-center py-1 px-1.5 space-y-0.5 rounded-xl transition-all border-none bg-transparent cursor-pointer ${
+                          mobileScreen === 'game'
+                            ? (themeMode === 'light' ? 'text-amber-600 bg-amber-500/10 font-bold' : 'text-gold-400 bg-gold-400/10 font-bold')
+                            : 'opacity-70 hover:opacity-100'
+                        }`}
+                      >
+                        <Flame className="w-4 h-4 transition-colors text-amber-500" />
+                        <span className="text-[7px] tracking-wide font-sans font-black uppercase text-center">{t.gameTab}</span>
                       </button>
 
                       {/* REFERRAL TAB */}
                       <button
-                        onClick={() => setMobileScreen('referral')}
-                        className={`flex flex-col items-center py-1 px-2.5 space-y-0.5 rounded-xl transition-all border-none bg-transparent cursor-pointer ${
+                        onClick={() => handleMobileScreenChange('referral')}
+                        className={`flex-1 flex flex-col items-center py-1 px-1.5 space-y-0.5 rounded-xl transition-all border-none bg-transparent cursor-pointer ${
                           mobileScreen === 'referral'
                             ? (themeMode === 'light' ? 'text-amber-600 bg-amber-500/10 font-bold' : 'text-gold-400 bg-gold-400/10 font-bold')
                             : 'opacity-70 hover:opacity-100'
                         }`}
                       >
                         <Gift className="w-4 h-4 transition-colors" />
-                        <span className="text-[7.5px] tracking-wide font-sans font-black uppercase text-center">{t.earn}</span>
+                        <span className="text-[7px] tracking-wide font-sans font-black uppercase text-center">{t.earn}</span>
                       </button>
 
                       {/* SETTING TAB */}
                       <button
-                        onClick={() => setMobileScreen('setting')}
-                        className={`flex flex-col items-center py-1 px-2.5 space-y-0.5 rounded-xl transition-all border-none bg-transparent cursor-pointer ${
+                        onClick={() => handleMobileScreenChange('setting')}
+                        className={`flex-1 flex flex-col items-center py-1 px-1.5 space-y-0.5 rounded-xl transition-all border-none bg-transparent cursor-pointer ${
                           mobileScreen === 'setting'
                             ? (themeMode === 'light' ? 'text-amber-600 bg-amber-500/10 font-bold' : 'text-gold-400 bg-gold-400/10 font-bold')
                             : 'opacity-70 hover:opacity-100'
                         }`}
                       >
                         <Settings className="w-4 h-4 transition-colors" />
-                        <span className="text-[7.5px] tracking-wide font-sans font-black uppercase text-center">{t.setting}</span>
+                        <span className="text-[7px] tracking-wide font-sans font-black uppercase text-center">{t.setting}</span>
                       </button>
                     </nav>
                   </div>

@@ -1,6 +1,6 @@
 {
   "name": "AdQuest Mobile Suite",
-  "description": "An interactive Flutter simulator and companion developer workspace showcasing a real-time Firestore refer-and-earn system integrated with Google Mobile Ads (AdMob).",
+  "description": "An interactive multi-app simulator and companion developer workspace showcasing real-time Firestore refer-and-earn systems integrated with Google Mobile Ads (AdMob) across 10 unified applications.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
