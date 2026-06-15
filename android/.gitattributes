@@ -1,0 +1,2 @@
+# Force treat any jar file in the android directory as binary
+*.jar binary

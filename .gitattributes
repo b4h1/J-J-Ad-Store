@@ -1,0 +1,7 @@
+# Ensure binary files are treated as binary to prevent corruption during Git actions (such as clone/checkout on pipelines)
+*.jar binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
